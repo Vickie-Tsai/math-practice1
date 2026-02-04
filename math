@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>九九乘法小測驗（2～9）</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+    body { margin: 0; background: #f6f7fb; color: #1f2937; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 20px; }
+    .card { background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+    h1 { margin: 0 0 10px; font-size: 22px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+      background: #2563eb; color: #fff; font-weight: 700;
+    }
+    button.secondary { background: #64748b; }
+    button.ghost { background: #e5e7eb; color: #111827; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .pill { background: #eef2ff; color: #3730a3; padding: 6px 10px; border-radius: 999px; font-weight: 800; }
+    .muted { color: #6b7280; }
+    .qbox { margin-top: 14px; }
+    .qtitle { font-size: 18px; font-weight: 900; margin: 10px 0 8px; }
+    .big { font-size: 44px; font-weight: 950; letter-spacing: 1px; }
+    input[type="number"], input[type="text"]{
+      font-size: 18px; padding: 10px 12px; border-radius: 10px; border: 2px solid #e5e7eb;
+    }
+    input[type="number"] { width: 160px; font-size: 22px; }
+    input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+    .hint { color: #6b7280; font-size: 13px; margin-top: 6px; }
+    .panel { border: 1px solid #eef2f7; border-radius: 12px; padding: 12px; background: #fff; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+    @media (min-width: 760px) { .grid { grid-template-columns: 1.2fr .8fr; } }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 12px; }
+    th, td { padding: 10px 10px; border-bottom: 1px solid #eef2f7; text-align: left; }
+    th { background: #f8fafc; font-weight: 900; }
+    tr.ok td { background: #f0fdf4; }
+    tr.bad td { background: #fff1f2; }
+    .scoreBox { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .scoreBig { font-size: 36px; font-weight: 950; }
+    .danger { color: #b91c1c; font-weight: 900; }
+    .okText { color: #15803d; font-weight: 900; }
+    .badgeTimer { background:#ecfeff; color:#155e75; }
+    .inline { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    label { font-weight: 800; }
+    .mini { font-size: 12px; }
+    .warn { color:#b45309; font-weight:800; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>九九乘法小測驗（只出 2～9）</h1>
+
+      <div class="row">
+        <div class="pill" id="statusPill">尚未開始</div>
+        <div class="pill badgeTimer" id="timerPill" style="display:none;">用時 00:00</div>
+        <div class="muted" id="progressText">共 20 題</div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <div class="inline" style="justify-content:space-between;">
+            <div style="font-weight:900;">出題設定</div>
+            <div class="muted mini">題目範圍：2～9</div>
+          </div>
+
+          <div class="inline" style="margin-top:10px;">
+            <label>
+              題數：
+              <input id="countInput" type="number" min="1" max="100" value="20" />
+            </label>
+
+            <label class="inline" style="gap:6px;">
+              <input id="repeatToggle" type="checkbox" checked />
+              允許重複
+            </label>
+
+            <button id="btnStart">開始出題</button>
+            <button id="btnSubmit" disabled>交卷評分</button>
+            <button id="btnReset" class="secondary" disabled>重新出題</button>
+          </div>
+
+          <div class="inline" style="margin-top:10px;">
+            <label class="inline" style="gap:6px;">
+              <input id="limitToggle" type="checkbox" />
+              每題限時
+            </label>
+            <label>
+              秒數：
+              <input id="limitSeconds" type="number" min="3" max="120" value="10" />
+            </label>
+            <div class="muted mini">（開啟後，超時會自動跳下一題並記為未作答）</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div style="font-weight:900;">小提醒</div>
+          <div class="muted" style="margin-top:6px;">
+            - Enter 送出這題並下一題<br/>
+            - 交卷後可按「錯題再練一次」只練錯的
+          </div>
+          <div id="uniqueWarn" class="warn" style="margin-top:8px; display:none;"></div>
+        </div>
+      </div>
+
+      <div class="qbox" id="quizArea" style="display:none;">
+        <div class="row" style="justify-content:space-between;">
+          <div class="qtitle">第 <span id="qIndex">1</span> / <span id="qTotal">20</span> 題</div>
+          <div class="pill badgeTimer" id="perQTimer" style="display:none;">本題剩餘 10s</div>
+        </div>
+
+        <div class="big" id="questionText">2 × 2 = ?</div>
+
+        <div class="row" style="margin-top:10px;">
+          <input id="answerInput" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="輸入答案" />
+          <button id="btnNext">下一題</button>
+          <button id="btnPrev" class="ghost">上一題</button>
+        </div>
+        <div class="hint">按 Enter 也可以送出；若開啟「每題限時」，時間到會自動下一題。</div>
+      </div>
+
+      <div id="resultArea" style="display:none; margin-top:16px;">
+        <div class="scoreBox">
+          <div class="scoreBig" id="scoreText">0/20</div>
+          <div class="muted" id="scoreHint">完成！</div>
+          <div class="muted" id="timeSummary"></div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <button id="btnRetryWrong" class="secondary" style="display:none;">錯題再練一次</button>
+          <button id="btnRetryAll" class="ghost">再做一份新題目</button>
+        </div>
+
+        <div class="grid" style="margin-top:12px;">
+          <div class="panel">
+            <div style="font-weight:900; margin-bottom:6px;">答題摘要</div>
+            <div>✅ 答對：<span class="okText" id="correctCount">0</span></div>
+            <div>❌ 答錯：<span class="danger" id="wrongCount">0</span></div>
+            <div>📊 正確率：<span id="accuracy">0%</span></div>
+          </div>
+          <div class="panel">
+            <div style="font-weight:900; margin-bottom:6px;">錯題說明</div>
+            <div class="muted" id="wrongNote">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:70px;">題號</th>
+                <th>題目</th>
+                <th style="width:110px;">你的答案</th>
+                <th style="width:110px;">正確答案</th>
+                <th style="width:90px;">結果</th>
+              </tr>
+            </thead>
+            <tbody id="resultTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // 固定範圍：2～9
+  const MIN = 2;
+  const MAX = 9;
+
+  // Elements
+  const statusPill = document.getElementById('statusPill');
+  const timerPill = document.getElementById('timerPill');
+  const progressText = document.getElementById('progressText');
+
+  const countInput = document.getElementById('countInput');
+  const repeatToggle = document.getElementById('repeatToggle');
+  const limitToggle = document.getElementById('limitToggle');
+  const limitSeconds = document.getElementById('limitSeconds');
+  const uniqueWarn = document.getElementById('uniqueWarn');
+
+  const btnStart = document.getElementById('btnStart');
+  const btnSubmit = document.getElementById('btnSubmit');
+  const btnReset = document.getElementById('btnReset');
+
+  const quizArea = document.getElementById('quizArea');
+  const qIndexEl = document.getElementById('qIndex');
+  const qTotalEl = document.getElementById('qTotal');
+  const questionText = document.getElementById('questionText');
+  const answerInput = document.getElementById('answerInput');
+  const btnNext = document.getElementById('btnNext');
+  const btnPrev = document.getElementById('btnPrev');
+  const perQTimer = document.getElementById('perQTimer');
+
+  const resultArea = document.getElementById('resultArea');
+  const scoreText = document.getElementById('scoreText');
+  const scoreHint = document.getElementById('scoreHint');
+  const timeSummary = document.getElementById('timeSummary');
+
+  const correctCountEl = document.getElementById('correctCount');
+  const wrongCountEl = document.getElementById('wrongCount');
+  const accuracyEl = document.getElementById('accuracy');
+  const wrongNote = document.getElementById('wrongNote');
+  const resultTable = document.getElementById('resultTable');
+
+  const btnRetryWrong = document.getElementById('btnRetryWrong');
+  const btnRetryAll = document.getElementById('btnRetryAll');
+
+  // State
+  let questions = []; // {a,b,key,correct,user:null}
+  let idx = 0;
+
+  // timers
+  let startTimeMs = null;
+  let totalTimerId = null;
+
+  let perQTimerId = null;
+  let perQRemain = 0;
+
+  // retry-wrong mode
+  let lastWrongSet = null; // array of question objects (a,b)
+
+  const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const fmtMs = (ms) => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${pad2(m)}:${pad2(r)}`;
+  };
+
+  function setStatus(text, kind = 'idle') {
+    statusPill.textContent = text;
+    if (kind === 'run') { statusPill.style.background = '#ecfeff'; statusPill.style.color = '#155e75'; }
+    else if (kind === 'done') { statusPill.style.background = '#f0fdf4'; statusPill.style.color = '#166534'; }
+    else { statusPill.style.background = '#eef2ff'; statusPill.style.color = '#3730a3'; }
+  }
+
+  function updateProgress() {
+    progressText.textContent = `第 ${Math.min(idx + 1, questions.length)} 題 / 共 ${questions.length} 題`;
+  }
+
+  function showUniqueWarn(total, allowRepeat) {
+    // 不重複的最大組合（2~9）共有 8*8=64 種 (含 2×3 與 3×2 視為不同)
+    const maxUnique = (MAX - MIN + 1) * (MAX - MIN + 1);
+    if (!allowRepeat && total > maxUnique) {
+      uniqueWarn.style.display = 'block';
+      uniqueWarn.textContent = `不重複模式下，最多只能出 ${maxUnique} 題（2～9 的乘法組合）。已自動把題數調為 ${maxUnique}。`;
+      countInput.value = maxUnique;
+      return maxUnique;
+    }
+    uniqueWarn.style.display = 'none';
+    return total;
+  }
+
+  function buildQuestions(total, allowRepeat) {
+    const arr = [];
+    if (allowRepeat) {
+      for (let i = 0; i < total; i++) {
+        const a = randInt(MIN, MAX);
+        const b = randInt(MIN, MAX);
+        arr.push({ a, b, key: `${a}x${b}`, correct: a * b, user: null });
+      }
+      return arr;
+    }
+
+    // 不重複：抽取不重複 key
+    const used = new Set();
+    while (arr.length < total) {
+      const a = randInt(MIN, MAX);
+      const b = randInt(MIN, MAX);
+      const key = `${a}x${b}`;
+      if (used.has(key)) continue;
+      used.add(key);
+      arr.push({ a, b, key, correct: a * b, user: null });
+    }
+    return arr;
+  }
+
+  function buildFromPairs(pairs) {
+    return pairs.map(p => ({ a: p.a, b: p.b, key: `${p.a}x${p.b}`, correct: p.a * p.b, user: null }));
+  }
+
+  function showQuestion() {
+    const q = questions[idx];
+    qIndexEl.textContent = (idx + 1);
+    qTotalEl.textContent = questions.length;
+    questionText.textContent = `${q.a} × ${q.b} = ?`;
+    answerInput.value = (q.user ?? '');
+    answerInput.focus();
+    updateProgress();
+    refreshSubmitEnabled();
+    restartPerQTimerIfNeeded();
+  }
+
+  function saveCurrentAnswer() {
+    const raw = answerInput.value;
+    if (raw === '') { questions[idx].user = null; return; }
+    const val = Number(raw);
+    if (!Number.isFinite(val)) { questions[idx].user = null; return; }
+    questions[idx].user = val;
+  }
+
+  function refreshSubmitEnabled() {
+    // 有任何作答就允許交卷
+    btnSubmit.disabled = !questions.some(q => q.user !== null);
+  }
+
+  function startTotalTimer() {
+    stopTotalTimer();
+    startTimeMs = Date.now();
+    timerPill.style.display = 'inline-block';
+    const tick = () => {
+      const elapsed = Date.now() - startTimeMs;
+      timerPill.textContent = `用時 ${fmtMs(elapsed)}`;
+    };
+    tick();
+    totalTimerId = setInterval(tick, 250);
+  }
+
+  function stopTotalTimer() {
+    if (totalTimerId) clearInterval(totalTimerId);
+    totalTimerId = null;
+  }
+
+  function stopPerQTimer() {
+    if (perQTimerId) clearInterval(perQTimerId);
+    perQTimerId = null;
+    perQTimer.style.display = 'none';
+  }
+
+  function restartPerQTimerIfNeeded() {
+    stopPerQTimer();
+    if (!limitToggle.checked) return;
+
+    const secs = Math.max(3, Math.min(120, Number(limitSeconds.value || 10)));
+    perQRemain = secs;
+    perQTimer.style.display = 'inline-block';
+    perQTimer.textContent = `本題剩餘 ${perQRemain}s`;
+
+    perQTimerId = setInterval(() => {
+      perQRemain--;
+      perQTimer.textContent = `本題剩餘 ${perQRemain}s`;
+      if (perQRemain <= 0) {
+        // 超時：記為未作答（清空），自動下一題
+        questions[idx].user = null;
+        stopPerQTimer();
+        if (idx < questions.length - 1) {
+          idx++;
+          showQuestion();
+        } else {
+          // 最後一題超時也直接交卷評分（顯示成績）
+          gradeQuiz(true);
+        }
+      }
+    }, 1000);
+  }
+
+  function startQuizWithSettings() {
+    let total = Number(countInput.value || 20);
+    total = Math.max(1, Math.min(100, total));
+    const allowRepeat = repeatToggle.checked;
+
+    total = showUniqueWarn(total, allowRepeat);
+
+    questions = buildQuestions(total, allowRepeat);
+    idx = 0;
+
+    lastWrongSet = null;
+
+    resultArea.style.display = 'none';
+    quizArea.style.display = 'block';
+
+    btnStart.disabled = true;
+    btnReset.disabled = false;
+    btnSubmit.disabled = true;
+
+    setStatus('作答中', 'run');
+
+    startTotalTimer();
+    showQuestion();
+  }
+
+  function startQuizFromWrong() {
+    if (!lastWrongSet || lastWrongSet.length === 0) return;
+
+    // 只練錯題（本次練習預設不重複且題目固定）
+    questions = buildFromPairs(lastWrongSet);
+    idx = 0;
+
+    resultArea.style.display = 'none';
+    quizArea.style.display = 'block';
+
+    btnStart.disabled = true;
+    btnReset.disabled = false;
+    btnSubmit.disabled = true;
+
+    setStatus('錯題複習中', 'run');
+
+    startTotalTimer();
+    showQuestion();
+  }
+
+  function nextStep() {
+    saveCurrentAnswer();
+    refreshSubmitEnabled();
+
+    if (idx < questions.length - 1) {
+      idx++;
+      showQuestion();
+    } else {
+      // 最後一題：提示可交卷
+      stopPerQTimer();
+      alert('你已到最後一題！可以按「交卷評分」。');
+    }
+  }
+
+  function prevStep() {
+    saveCurrentAnswer();
+    refreshSubmitEnabled();
+    if (idx > 0) {
+      idx--;
+      showQuestion();
+    }
+  }
+
+  function gradeQuiz(autoFromTimeout=false) {
+    // 先存一下最後停留那題（若是手動交卷）
+    if (!autoFromTimeout && quizArea.style.display !== 'none') saveCurrentAnswer();
+    stopPerQTimer();
+
+    stopTotalTimer();
+    const elapsed = startTimeMs ? (Date.now() - startTimeMs) : 0;
+
+    let correct = 0;
+    resultTable.innerHTML = '';
+
+    const wrongPairs = [];
+
+    questions.forEach((q, i) => {
+      const isCorrect = (q.user === q.correct);
+      if (isCorrect) correct++;
+      else wrongPairs.push({ a: q.a, b: q.b });
+
+      const tr = document.createElement('tr');
+      tr.className = isCorrect ? 'ok' : 'bad';
+
+      const userText = (q.user === null) ? '（未作答）' : String(q.user);
+
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${q.a} × ${q.b}</td>
+        <td>${userText}</td>
+        <td>${q.correct}</td>
+        <td>${isCorrect ? '✅' : '❌'}</td>
+      `;
+      resultTable.appendChild(tr);
+    });
+
+    const total = questions.length;
+    const wrong = total - correct;
+    const acc = Math.round((correct / total) * 100);
+
+    scoreText.textContent = `${correct}/${total}`;
+    correctCountEl.textContent = correct;
+    wrongCountEl.textContent = wrong;
+    accuracyEl.textContent = `${acc}%`;
+
+    timeSummary.textContent = `本次用時：${fmtMs(elapsed)}`;
+
+    scoreHint.textContent =
+      acc === 100 ? '太強了！全對！' :
+      acc >= 80 ? '表現很棒！再挑戰一次？' :
+      acc >= 60 ? '不錯喔！再練幾次會更熟～' :
+      '先別急，慢慢練，一次進步一點點！';
+
+    setStatus('已完成', 'done');
+
+    // 錯題再練一次
+    lastWrongSet = wrongPairs;
+    if (wrongPairs.length > 0) {
+      btnRetryWrong.style.display = 'inline-block';
+      wrongNote.textContent = `共有 ${wrongPairs.length} 題錯題，可以按「錯題再練一次」只練這些題目。`;
+    } else {
+      btnRetryWrong.style.display = 'none';
+      wrongNote.textContent = '沒有錯題！你可以按「再做一份新題目」再挑戰一次。';
+    }
+
+    quizArea.style.display = 'none';
+    resultArea.style.display = 'block';
+
+    btnSubmit.disabled = true;
+  }
+
+  function resetAll() {
+    stopPerQTimer();
+    stopTotalTimer();
+    startTimeMs = null;
+
+    questions = [];
+    idx = 0;
+
+    quizArea.style.display = 'none';
+    resultArea.style.display = 'none';
+
+    btnStart.disabled = false;
+    btnReset.disabled = true;
+    btnSubmit.disabled = true;
+
+    timerPill.style.display = 'none';
+    timerPill.textContent = '用時 00:00';
+
+    setStatus('尚未開始', 'idle');
+    progressText.textContent = `共 ${Number(countInput.value || 20)} 題`;
+    uniqueWarn.style.display = 'none';
+  }
+
+  // Events
+  btnStart.addEventListener('click', startQuizWithSettings);
+  btnNext.addEventListener('click', nextStep);
+  btnPrev.addEventListener('click', prevStep);
+  btnSubmit.addEventListener('click', () => gradeQuiz(false));
+  btnReset.addEventListener('click', resetAll);
+
+  btnRetryWrong.addEventListener('click', () => startQuizFromWrong());
+  btnRetryAll.addEventListener('click', () => {
+    resetAll();
+    startQuizWithSettings();
+  });
+
+  answerInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') nextStep();
+  });
+
+  // 當切換限時時，若正在作答就立即套用
+  limitToggle.addEventListener('change', () => {
+    if (quizArea.style.display !== 'none' && questions.length) restartPerQTimerIfNeeded();
+  });
+  limitSeconds.addEventListener('change', () => {
+    if (quizArea.style.display !== 'none' && questions.length && limitToggle.checked) restartPerQTimerIfNeeded();
+  });
+
+  // Init
+  resetAll();
+})();
+</script>
+</body>
+</html>
